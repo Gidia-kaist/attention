@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import Union, Tuple, Optional, Sequence
-
+from bindsnet import shared_preference
 import numpy as np
 import torch
 from torch.nn import Module, Parameter
@@ -173,8 +173,28 @@ class Connection(AbstractConnection):
         :return: Incoming spikes multiplied by synaptic weights (with or without
                  decaying spike activation).
         """
-        # Compute multiplication of spike activations by weights and add bias.
-        post = s.float().view(s.size(0), -1) @ self.w + self.b
+        mark = shared_preference.get_attention_on(shared_preference)
+        #print(mark)
+        if shared_preference.get_attention_on(shared_preference) is 1:
+            # Compute multiplication of spike activations by weights and add bias.
+            if sum(list(s.shape)) == 32 + 1 + 28 + 28:
+                #print("1")
+                output_att = shared_preference.get_attention(shared_preference)  # 200, 32, 784
+                spike = s.float().view(s.size(0), -1)
+                # print("spike ", spike.shape)
+                a = torch.mul(output_att, spike)
+                b = a.permute(1, 2, 0)
+                # print("a ", a.shape)
+                # print("b ", b.shape)
+                post = torch.mul(b, self.w).sum(dim=1) + self.b
+                # print("post shape ", post.shape)
+            else:
+                #print("2 or 3")
+                post = s.float().view(s.size(0), -1) @ self.w + self.b
+                #print("11111")
+        else:
+            post = s.float().view(s.size(0), -1) @ self.w + self.b
+            #print("2222")
         return post.view(s.size(0), *self.target.shape)
 
     def update(self, **kwargs) -> None:

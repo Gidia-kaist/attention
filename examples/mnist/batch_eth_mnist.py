@@ -4,12 +4,12 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-
+import pandas as pd
 from torchvision import transforms
 from tqdm import tqdm
 
 from time import time as t
-
+from bindsnet import shared_preference
 from bindsnet import ROOT_DIR
 from bindsnet.datasets import MNIST, DataLoader
 from bindsnet.encoding import PoissonEncoder, poisson
@@ -47,7 +47,7 @@ parser.add_argument("--test", dest="train", action="store_false")
 parser.add_argument("--plot", dest="plot", action="store_true")
 parser.add_argument("--gpu", dest="gpu", action="store_true")
 parser.add_argument("--attention", type=int, default=1)
-parser.set_defaults(plot=False, gpu=False, train=True)
+parser.set_defaults(plot=True, gpu=False, train=True)
 
 args = parser.parse_args()
 
@@ -73,6 +73,9 @@ attention = args.attention
 update_interval = update_steps * batch_size
 print("using attention : ", attention)
 count = 0
+
+
+shared_preference.set_attention_on(shared_preference, attention)
 
 # Sets up Gpu use
 if gpu and torch.cuda.is_available():
@@ -171,6 +174,13 @@ start = t()
 
 for epoch in range(n_epochs):
     labels = []
+    if epoch is 1:
+        h = network.connections[("X", "Ae")].w.cpu()
+        k = h.numpy()
+        dfw = pd.DataFrame(k)
+        dfw.to_csv(
+            '/home/gidia/anaconda3/envs/myenv/projects/attention_SNN/results/excel/weight.csv',
+            index=False)
 
     if epoch % progress_interval == 0:
         print("Progress: %d / %d (%.4f seconds)" % (epoch, n_epochs, t() - start))
@@ -192,21 +202,25 @@ for epoch in range(n_epochs):
             batch["encoded_image"] = batch["encoded_image"].permute(1, 0, 2, 3)
             # print(batch["encoded_image"].sum())
             input_dataset = batch["encoded_image"].squeeze(1)
-
+            output_att = []
             ####여기가 문제#######################
             for b in range(batch_size):
                 weight_matrix = network.connections[("X", "Ae")].w.cpu()
-                query = input_dataset[b].view(1, 784)
-                # print(query)
-                query_sum = query.sum()/784
-                #print(query_sum)
-                index = torch.argmax(torch.matmul(query, weight_matrix))
-                print(index)
+                weight_matrix = weight_matrix.T
+                query = input_dataset[b].view(1, 784).squeeze(0)
+                a = torch.mul(query, weight_matrix)
+                query_sum = query.sum()
                 softmax = torch.nn.Softmax(dim=1)
-                attention_score = softmax(torch.mul(query, weight_matrix[:, index]))
-                input_dataset[b] = (torch.round(torch.mul(query*400, attention_score)*10**4)/10**4).reshape(28, 28)
+                output = softmax(a)*10
+                output = np.array(output)
+                output_att.append(output)
+            output_att = torch.tensor(output_att).view(32, 200, 784)
+            output_att = output_att.permute(1, 0, 2)
+            shared_preference.set_attention(shared_preference, output_att)
+
+
+
             batch["encoded_image"] = input_dataset.unsqueeze(1)
-            ####여기가 문제#######################
             a = poisson(batch["encoded_image"][0], time=time, dt=dt).unsqueeze(0)
             for i in range(batch_size - 1):
                 temp = poisson(batch["encoded_image"][i + 1], time=time, dt=dt).unsqueeze(0)

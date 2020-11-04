@@ -13,6 +13,7 @@ from . import (
     evaluation,
     environment,
     conversion,
+    shared_preference,
 )
 
 ROOT_DIR = Path(__file__).parents[0].parents[0]

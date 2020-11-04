@@ -4,6 +4,10 @@ import torch
 class SharedPreference:
 
     # Default setting
+
+
+
+
     filter_mask = False
     error_mask = False
     boolean_mask = torch.ones(1600)
@@ -17,6 +21,9 @@ class SharedPreference:
 
     def __init__(self):
         self.filter_mask = False
+
+
+
 
     # Check the accuracy for making decision whether set the connectivity or not
     def set_filter_mask(self, boolean_inpt: bool):
@@ -80,3 +87,21 @@ class SharedPreference:
 
     def get_error(self):
         return self.error_mask
+
+
+def set_attention(self, attention_score: torch):
+    self.attention_score = attention_score
+    # print(self.attention_score.shape)
+    return self.attention_score
+
+
+def get_attention(self):
+    return self.attention_score
+
+def set_attention_on(self, marker: int):
+    self.marker = marker
+    # print(self.attention_score.shape)
+    return self.marker
+
+def get_attention_on(self):
+    return self.marker
